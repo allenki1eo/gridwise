@@ -19,8 +19,15 @@ export function getCellValue(cells, ref, sheet) {
   const idx = cellRefToIndex(ref);
   if (!idx) return 0;
   const key = `${idx.row}-${idx.col}`;
-  const raw = (sheet || cells)[key]?.value ?? '';
+  const c = sheet || cells;
+  const raw = c[key]?.value ?? '';
   if (raw === '' || raw === undefined) return 0;
+  // If this cell itself contains a formula, evaluate it first
+  if (typeof raw === 'string' && raw.startsWith('=')) {
+    const result = evaluateFormula(raw, c);
+    const num = Number(result);
+    return isNaN(num) ? result : num;
+  }
   const num = Number(raw);
   return isNaN(num) ? raw : num;
 }
@@ -36,8 +43,14 @@ function parseCellRange(range, cells) {
     for (let c = s.col; c <= e.col; c++) {
       const key = `${r}-${c}`;
       const raw = cells[key]?.value ?? '';
-      const num = Number(raw);
-      if (raw !== '' && !isNaN(num)) values.push(num);
+      if (raw === '') continue;
+      // Evaluate formula cells before adding to range values
+      let resolved = raw;
+      if (typeof raw === 'string' && raw.startsWith('=')) {
+        resolved = evaluateFormula(raw, cells);
+      }
+      const num = Number(resolved);
+      if (!isNaN(num)) values.push(num);
     }
   }
   return values;
