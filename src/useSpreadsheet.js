@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { evaluateFormula } from './formulaEngine';
+import * as XLSX from 'xlsx';
 
 export const ROWS = 100;
 export const COLS = 26;
@@ -168,6 +169,55 @@ export function useSpreadsheet() {
     }));
   }, [activeSheet]);
 
+  const importXLSX = useCallback((arrayBuffer) => {
+    try {
+      const wb = XLSX.read(arrayBuffer, { type: 'array' });
+      // Load all sheets
+      setSheets(prev => {
+        const newSheets = wb.SheetNames.map(name => {
+          const ws = wb.Sheets[name];
+          const json = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+          const cells = {};
+          json.forEach((row, ri) => {
+            if (ri >= ROWS) return;
+            (row || []).forEach((val, ci) => {
+              if (ci < COLS && val !== '') {
+                const v = String(val).trim();
+                if (v) cells[`${ri}-${ci}`] = { value: v };
+              }
+            });
+          });
+          return { name, cells };
+        });
+        return newSheets.length > 0 ? newSheets : prev;
+      });
+      setActiveSheet(0);
+    } catch (err) {
+      console.error('XLSX import error:', err);
+    }
+  }, []);
+
+  const exportCSV = useCallback(() => {
+    const cells = currentCells;
+    const usedKeys = Object.keys(cells);
+    if (!usedKeys.length) return;
+    let maxRow = 0, maxCol = 0;
+    usedKeys.forEach(k => { const [r,c]=k.split('-').map(Number); if(r>maxRow)maxRow=r; if(c>maxCol)maxCol=c; });
+    const rows = [];
+    for (let r = 0; r <= maxRow; r++) {
+      const row = [];
+      for (let c = 0; c <= maxCol; c++) {
+        const v = getCellDisplay(r, c, cells);
+        row.push(v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v);
+      }
+      rows.push(row.join(','));
+    }
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'gridwise.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }, [currentCells, getCellDisplay]);
+
   const importCSV = useCallback((text) => {
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     const newCells = {};
@@ -252,7 +302,7 @@ export function useSpreadsheet() {
     colWidths, rowHeights, getColWidth, getRowHeight, setColWidth, setRowHeight,
     selectionRange, setSelectionRange,
     clipboard, copySelection, pasteSelection,
-    addSheet, getSheetData, applyAICells, importCSV,
+    addSheet, getSheetData, applyAICells, importCSV, importXLSX, exportCSV,
     getStatusBarInfo,
     ROWS, COLS,
   };
