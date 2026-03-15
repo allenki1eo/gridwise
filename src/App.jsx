@@ -7,7 +7,6 @@ import './App.css';
 
 export default function App() {
   const [theme, setTheme] = useState('dark');
-  const [apiKey, setApiKey] = useState('');
   const [formulaBarValue, setFormulaBarValue] = useState('');
   const [formulaBarEditing, setFormulaBarEditing] = useState(false);
 
@@ -278,8 +277,6 @@ export default function App() {
         >
           <AIChat
             theme={theme}
-            apiKey={apiKey}
-            setApiKey={setApiKey}
             sheetData={getSheetData()}
             selected={selected}
             sheetName={sheets[activeSheet].name}
